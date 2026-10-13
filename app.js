@@ -120,7 +120,7 @@
   }
 
   // 标记单词已学（首次学习时自动进入复习队列：1 天后该复习）
-  function markLearned(w, skipSave) {
+  function markLearned(w) {
     const k = wordKey(w);
     if (!state.progress[k]) state.progress[k] = {};
     const p = state.progress[k];
@@ -133,8 +133,7 @@
       p.interval = REVIEW_INTERVALS[0];
       p.nextReview = Date.now() + p.interval * ONE_DAY;
     }
-    // 批量操作时传入 skipSave，由调用方统一保存一次，避免逐词写盘导致卡顿
-    if (!skipSave) save();
+    save();
   }
 
   // 标记为已掌握：退出复习队列
@@ -848,12 +847,6 @@
         save();
         renderList();
       });
-    });
-    document.getElementById('markAllLearnedBtn').addEventListener('click', () => {
-      currentList.forEach(w => markLearned(w, true));
-      save();
-      toast('已将当前列表全部标记为已学', 'success');
-      renderList();
     });
     document.getElementById('resetLearnedBtn').addEventListener('click', () => {
       if (confirm('确定要重置所有学习进度吗？此操作不可恢复。')) {
