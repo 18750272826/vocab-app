@@ -354,6 +354,19 @@
       <div class="modal-tags">
         ${(w.tags || []).map(t => '<span class="tag-chip">' + t + '</span>').join('')}
       </div>
+      ${w.related && w.related.length ? `
+      <div class="modal-related">
+        <div class="related-title">关联词汇</div>
+        <div class="related-list">
+          ${w.related.map(r => `
+            <div class="related-item" data-word="${r.word}" data-type="${r.type}">
+              <span class="related-type">${r.type}</span>
+              <span class="related-word">${r.word}</span>
+              <button class="speak-btn-mini" data-speak="${r.word}" title="朗读">🔊</button>
+            </div>
+          `).join('')}
+        </div>
+      </div>` : ''}
       <div class="modal-actions">
         ${mastered
           ? '<button class="btn-outline" id="modalUnmark">取消标记</button>'
@@ -377,6 +390,22 @@
       closeModal();
       renderList();
     };
+    // 关联词：点击跳转 / 朗读
+    const relItems = document.querySelectorAll('.related-item');
+    relItems.forEach(item => {
+      const rw = item.getAttribute('data-word');
+      item.querySelector('.related-word').onclick = (e) => {
+        e.stopPropagation();
+        const found = ALL_WORDS.find(x => x.word.toLowerCase() === rw.toLowerCase());
+        if (found) {
+          openWordModal(found);
+        } else {
+          speakWord(rw);
+        }
+      };
+      const miniSpeak = item.querySelector('.speak-btn-mini');
+      if (miniSpeak) miniSpeak.onclick = (e) => { e.stopPropagation(); speakWord(rw); };
+    });
   }
 
   function closeModal() {
