@@ -1,0 +1,8 @@
+*.py
+gen_words.py
+shuffle_words.js
+shuffle_words2.js
+split_words.js
+node_modules/
+*.log
+.DS_Store
