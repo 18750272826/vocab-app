@@ -3,7 +3,7 @@
    功能: 离线缓存、资源预缓存、更新管理
    =========================================== */
 
-const CACHE_VERSION = 'vocab-pwa-v5';
+const CACHE_VERSION = 'vocab-pwa-v6';
 const CACHE_NAME = CACHE_VERSION;
 
 // 需要预缓存的核心资源

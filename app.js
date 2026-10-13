@@ -41,6 +41,7 @@
     grade: 'all',          // 当前筛选年级
     search: '',            // 搜索关键词
     view: 'list',          // 当前视图
+    hideLearned: true,     // 单词本默认隐藏已学/已掌握单词
     progress: {},          // 单词进度 { wordKey: { learned: bool, mastered: bool } }
     history: []            // 学习记录
   };
@@ -87,7 +88,8 @@
     try {
       localStorage.setItem(STORAGE_KEY, JSON.stringify({
         progress: state.progress,
-        history: state.history
+        history: state.history,
+        hideLearned: state.hideLearned
       }));
     } catch (e) { /* localStorage 不可用时静默 */ }
   }
@@ -99,6 +101,8 @@
         const data = JSON.parse(raw);
         state.progress = data.progress || {};
         state.history = data.history || [];
+        // 未保存过该偏好时保持默认隐藏
+        if (typeof data.hideLearned === 'boolean') state.hideLearned = data.hideLearned;
       }
     } catch (e) {}
   }
@@ -114,7 +118,7 @@
   }
 
   // 标记单词已学（首次学习时自动进入复习队列：1 天后该复习）
-  function markLearned(w) {
+  function markLearned(w, skipSave) {
     const k = wordKey(w);
     if (!state.progress[k]) state.progress[k] = {};
     const p = state.progress[k];
@@ -127,7 +131,8 @@
       p.interval = REVIEW_INTERVALS[0];
       p.nextReview = Date.now() + p.interval * ONE_DAY;
     }
-    save();
+    // 批量操作时传入 skipSave，由调用方统一保存一次，避免逐词写盘导致卡顿
+    if (!skipSave) save();
   }
 
   // 标记为已掌握：退出复习队列
@@ -260,12 +265,26 @@
   // ===== 单词列表渲染 =====
   function renderList() {
     const grid = document.getElementById('wordGrid');
-    const list = getFilteredWords();
+    let list = getFilteredWords();
+    // 默认隐藏已学/已掌握的单词；搜索时不过滤，方便查找已学过的词
+    if (state.hideLearned && !state.search) {
+      list = list.filter(w => !isLearned(w));
+    }
     currentList = list;
+    // 同步切换按钮文案
+    const toggleBtn = document.getElementById('toggleLearnedBtn');
+    if (toggleBtn) {
+      toggleBtn.textContent = state.hideLearned ? '显示已学单词' : '隐藏已学单词';
+      toggleBtn.classList.toggle('active', !state.hideLearned);
+    }
     document.getElementById('resultCount').textContent = '共 ' + list.length + ' 个单词';
 
     if (list.length === 0) {
-      grid.innerHTML = '<div style="text-align:center;color:#94a3b8;padding:60px 20px;grid-column:1/-1;">没有找到匹配的单词</div>';
+      const emptyMsg = (state.hideLearned && !state.search && getFilteredWords().length > 0)
+        ? '当前范围的单词都已学完！点上方「显示已学单词」可查看。'
+        : '没有找到匹配的单词';
+      grid.innerHTML = '<div style="text-align:center;color:#94a3b8;padding:60px 20px;grid-column:1/-1;">' + emptyMsg + '</div>';
+      renderHeaderStats();
       return;
     }
 
@@ -809,8 +828,14 @@
     });
 
     // 列表操作
+    document.getElementById('toggleLearnedBtn').addEventListener('click', () => {
+      state.hideLearned = !state.hideLearned;
+      save();
+      renderList();
+    });
     document.getElementById('markAllLearnedBtn').addEventListener('click', () => {
-      currentList.forEach(w => markLearned(w));
+      currentList.forEach(w => markLearned(w, true));
+      save();
       toast('已将当前列表全部标记为已学', 'success');
       renderList();
     });

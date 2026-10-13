@@ -295,6 +295,12 @@ body {
   color: #fff;
 }
 
+/* 显示已学单词激活态：高亮表示当前正在显示已学/已掌握的单词 */
+.btn-text.active {
+  background: var(--primary);
+  color: #fff;
+}
+
 .word-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
