@@ -50,6 +50,7 @@
   let flashQueue = [];      // 闪卡队列
   let flashIdx = 0;
   let flashFlipped = false;
+  let flashMode = 'normal'; // 'normal' = 普通浏览/学习，'review' = 今日复习
   let quizQueue = [];
   let quizIdx = 0;
   let quizScore = 0;
@@ -112,19 +113,32 @@
     }, 1800);
   }
 
-  // 标记单词已学
+  // 标记单词已学（首次学习时自动进入复习队列：1 天后该复习）
   function markLearned(w) {
     const k = wordKey(w);
     if (!state.progress[k]) state.progress[k] = {};
-    state.progress[k].learned = true;
+    const p = state.progress[k];
+    p.learned = true;
+    // 仅在首次学习时初始化复习时间，避免重复标记导致复习时间被刷新
+    if (!p.firstLearned) {
+      p.firstLearned = Date.now();
+      p.lastReview = Date.now();
+      p.reviewCount = 0;
+      p.interval = REVIEW_INTERVALS[0];
+      p.nextReview = Date.now() + p.interval * ONE_DAY;
+    }
     save();
   }
 
+  // 标记为已掌握：退出复习队列
   function markMastered(w) {
     const k = wordKey(w);
     if (!state.progress[k]) state.progress[k] = {};
-    state.progress[k].learned = true;
-    state.progress[k].mastered = true;
+    const p = state.progress[k];
+    p.learned = true;
+    p.mastered = true;
+    p.nextReview = null;
+    p.interval = null;
     save();
   }
 
@@ -136,6 +150,72 @@
   function isMastered(w) {
     const p = state.progress[wordKey(w)];
     return p && p.mastered;
+  }
+
+  // ===== 艾宾浩斯记忆曲线复习机制 =====
+  // 复习间隔（天）：答对后按此序列延长
+  const REVIEW_INTERVALS = [1, 2, 4, 7, 15, 30];
+  const ONE_DAY = 24 * 60 * 60 * 1000;
+
+  // 取某时间戳所在当天的 0 点（用于"按天"判断是否到期）
+  function startOfDay(ts) {
+    const d = new Date(ts || Date.now());
+    d.setHours(0, 0, 0, 0);
+    return d.getTime();
+  }
+
+  // 该单词是否到了该复习的时间
+  function isDueReview(w) {
+    const p = state.progress[wordKey(w)];
+    if (!p || !p.learned || p.mastered) return false;
+    if (!p.nextReview) return false;
+    return startOfDay(p.nextReview) <= startOfDay(Date.now());
+  }
+
+  // 取所有今天该复习的单词
+  function getDueReviews() {
+    return ALL_WORDS.filter(w => isDueReview(w));
+  }
+
+  // 今天已完成复习的单词数
+  function getTodayReviewedCount() {
+    const todayStart = startOfDay(Date.now());
+    return ALL_WORDS.filter(w => {
+      const p = state.progress[wordKey(w)];
+      return p && p.lastReview && startOfDay(p.lastReview) === todayStart;
+    }).length;
+  }
+
+  // 复习一个单词：correct=true 答对（推进曲线），false 答错（重置回 1 天）
+  function reviewWord(w, correct) {
+    const k = wordKey(w);
+    if (!state.progress[k]) state.progress[k] = {};
+    const p = state.progress[k];
+    // 已掌握的词不再走复习流程，避免被重新加入队列
+    if (p.mastered) return;
+    p.learned = true;
+    const now = Date.now();
+    if (!p.firstLearned) p.firstLearned = now;
+    p.lastReview = now;
+    if (correct) {
+      p.reviewCount = (p.reviewCount || 0) + 1;
+      if (p.reviewCount >= REVIEW_INTERVALS.length) {
+        // 复习全部通过，标记为已掌握
+        p.mastered = true;
+        p.nextReview = null;
+        p.interval = null;
+      } else {
+        // 索引 = 已成功复习次数，下次间隔按曲线延长
+        p.interval = REVIEW_INTERVALS[p.reviewCount];
+        p.nextReview = now + p.interval * ONE_DAY;
+      }
+    } else {
+      // 答错：复习次数退一格，间隔回到 1 天
+      p.reviewCount = Math.max(0, (p.reviewCount || 0) - 1);
+      p.interval = REVIEW_INTERVALS[0];
+      p.nextReview = now + p.interval * ONE_DAY;
+    }
+    save();
   }
 
   // 筛选单词
@@ -160,6 +240,7 @@
       b.classList.toggle('active', b.dataset.view === view);
     });
     if (view === 'list') renderList();
+    if (view === 'flashcard') refreshReviewBadge();
     if (view === 'stats') renderStats();
   }
 
@@ -280,7 +361,22 @@
       toast('没有可学习的单词', 'error');
       return;
     }
+    flashMode = 'normal';
     flashQueue = shuffle(base);
+    flashIdx = 0;
+    flashFlipped = false;
+    renderFlashcard();
+  }
+
+  // 今日复习模式：仅加载今天到该复习的单词
+  function initFlashcardReview() {
+    const due = getDueReviews();
+    if (due.length === 0) {
+      toast('今天没有需要复习的单词，继续背新词吧！', 'success');
+      return;
+    }
+    flashMode = 'review';
+    flashQueue = shuffle(due);
     flashIdx = 0;
     flashFlipped = false;
     renderFlashcard();
@@ -288,10 +384,25 @@
 
   function renderFlashcard() {
     if (flashIdx >= flashQueue.length) {
-      toast('全部单词学完！', 'success');
+      if (flashMode === 'review') {
+        toast('今日复习全部完成，太棒了！🏆', 'success');
+      } else {
+        toast('全部单词学完！', 'success');
+      }
       flashIdx = 0;
     }
     const w = flashQueue[flashIdx];
+    // 复习模式标识
+    const modeEl = document.getElementById('flashMode');
+    if (modeEl) {
+      if (flashMode === 'review') {
+        modeEl.textContent = '🔁 今日复习';
+        modeEl.style.display = 'inline-block';
+      } else {
+        modeEl.textContent = '';
+        modeEl.style.display = 'none';
+      }
+    }
     document.getElementById('flashIndex').textContent = flashIdx + 1;
     document.getElementById('flashTotal').textContent = flashQueue.length;
     document.getElementById('flashGrade').textContent = getGradeName(w.grade);
@@ -313,6 +424,25 @@
     }
     document.getElementById('flashTags').innerHTML =
       (w.tags || []).map(t => '<span class="tag-chip">' + t + '</span>').join('');
+    // 复习模式下提示用户该词的复习进度
+    const hintEl = document.getElementById('flashHint');
+    if (hintEl) {
+      const p = state.progress[wordKey(w)];
+      if (flashMode === 'review' && p) {
+        const rc = p.reviewCount || 0;
+        let next;
+        if (rc >= REVIEW_INTERVALS.length - 1) {
+          // 再答对一次即完成全部复习曲线，标记为已掌握
+          next = '答对即可掌握 🏆';
+        } else {
+          const nextInterval = REVIEW_INTERVALS[rc + 1];
+          next = '答对后 ' + nextInterval + ' 天后再复习';
+        }
+        hintEl.textContent = '已复习 ' + rc + ' 次 · ' + next + ' · 点击翻面看释义';
+      } else {
+        hintEl.textContent = '点击卡片查看释义';
+      }
+    }
     // 绑定闪卡朗读按钮（阻止冒泡，避免触发翻卡）
     const speakFront = document.getElementById('flashSpeakFront');
     const speakBack = document.getElementById('flashSpeakBack');
@@ -320,6 +450,15 @@
     if (speakBack) speakBack.onclick = (e) => { e.stopPropagation(); speakWord(w.word); };
     flashFlipped = false;
     document.getElementById('flashcard').classList.remove('flipped');
+  }
+
+  // 刷新"今日复习"按钮上的待复习数字徽标
+  function refreshReviewBadge() {
+    const btn = document.getElementById('flashStartReview');
+    if (!btn) return;
+    const due = getDueReviews().length;
+    btn.textContent = '今日复习' + (due > 0 ? ' (' + due + ')' : '');
+    btn.classList.toggle('has-due', due > 0);
   }
 
   function flipCard() {
@@ -346,14 +485,39 @@
   }
 
   function flashKnown() {
-    markMastered(flashQueue[flashIdx]);
-    toast('已标记为掌握', 'success');
+    const w = flashQueue[flashIdx];
+    if (flashMode === 'review') {
+      // 复习模式：答对 → 按曲线延长下次复习间隔
+      reviewWord(w, true);
+      const p = state.progress[wordKey(w)];
+      if (p.mastered) {
+        toast('复习全部通过，已掌握这个词！🏆', 'success');
+      } else {
+        toast('答对！下次复习：' + p.interval + ' 天后', 'success');
+      }
+      refreshReviewBadge();
+    } else {
+      // 普通模式：直接标记为已掌握
+      markMastered(w);
+      toast('已标记为掌握', 'success');
+    }
+    renderHeaderStats();
     flashNext();
   }
 
   function flashUnfamiliar() {
-    markLearned(flashQueue[flashIdx]);
-    toast('已标记为已学，需复习');
+    const w = flashQueue[flashIdx];
+    if (flashMode === 'review') {
+      // 复习模式：答错 → 重置回 1 天后复习
+      reviewWord(w, false);
+      toast('记错了，明天再来复习这个词', 'error');
+      refreshReviewBadge();
+    } else {
+      // 普通模式：标记为已学（首次学习时自动进入复习队列）
+      markLearned(w);
+      toast('已标记为已学，1 天后将进入复习');
+    }
+    renderHeaderStats();
     flashNext();
   }
 
@@ -410,10 +574,13 @@
           quizScore++;
           fb.textContent = '✓ 回答正确！';
           fb.className = 'quiz-feedback show feedback-correct';
-          markLearned(w);
+          // 已学过的词走复习流程，未学过的标记为已学（自动进入复习队列）
+          if (isLearned(w)) reviewWord(w, true); else markLearned(w);
         } else {
           fb.textContent = '✗ 正确答案：' + w.meaning;
           fb.className = 'quiz-feedback show feedback-wrong';
+          // 已学过的词答错也算一次复习（间隔回到 1 天）
+          if (isLearned(w)) reviewWord(w, false);
         }
         document.getElementById('quizNextBtn').style.display = 'inline-block';
       });
@@ -503,10 +670,13 @@
       spellScore++;
       fb.textContent = '✓ 拼写正确！' + w.word + ' — ' + w.meaning;
       fb.className = 'spell-feedback show feedback-correct';
-      markLearned(w);
+      // 已学过的词走复习流程，未学过的标记为已学（自动进入复习队列）
+      if (isLearned(w)) reviewWord(w, true); else markLearned(w);
     } else {
       fb.textContent = '✗ 正确拼写：' + w.word + ' (你写的是 ' + ans + ')';
       fb.className = 'spell-feedback show feedback-wrong';
+      // 已学过的词答错也算一次复习（间隔回到 1 天）
+      if (isLearned(w)) reviewWord(w, false);
     }
     document.getElementById('spellSubmitBtn').style.display = 'none';
     document.getElementById('spellHintBtn').style.display = 'none';
@@ -566,10 +736,16 @@
     const pct = total ? Math.round(learned / total * 100) : 0;
     const masterPct = total ? Math.round(mastered / total * 100) : 0;
 
+    // 今日复习相关统计
+    const dueCount = getDueReviews().length;
+    const reviewedToday = getTodayReviewedCount();
+
     const cards = [
       { num: total, label: '总词数', cls: '' },
       { num: learned, label: '已学 (' + pct + '%)', cls: 'warning' },
       { num: mastered, label: '已掌握 (' + masterPct + '%)', cls: 'success' },
+      { num: dueCount, label: '今日待复习', cls: dueCount > 0 ? 'danger' : '' },
+      { num: reviewedToday, label: '今日已复习', cls: '' },
       { num: state.history.length, label: '练习次数', cls: '' }
     ];
     document.getElementById('statsCards').innerHTML = cards.map(c =>
@@ -658,6 +834,10 @@
     document.getElementById('flashUnfamiliar').addEventListener('click', (e) => { e.stopPropagation(); flashUnfamiliar(); });
     document.getElementById('flashStartLearned').addEventListener('click', () => initFlashcard(true));
     document.getElementById('flashShuffle').addEventListener('click', () => initFlashcard(false));
+    document.getElementById('flashStartReview').addEventListener('click', () => {
+      initFlashcardReview();
+      refreshReviewBadge();
+    });
 
     // 测验
     document.getElementById('quizStartBtn').addEventListener('click', startQuiz);
@@ -709,6 +889,8 @@
     renderList();
     // 默认初始化闪卡队列(全部)
     initFlashcard(false);
+    // 刷新今日复习按钮徽标
+    refreshReviewBadge();
   }
 
   if (document.readyState === 'loading') {

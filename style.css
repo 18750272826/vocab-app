@@ -717,6 +717,45 @@ body {
   border-color: var(--primary);
 }
 
+/* ===== 今日复习模式相关 ===== */
+/* 闪卡顶部"今日复习"标识 */
+.flash-mode {
+  display: inline-block;
+  background: var(--warning-bg);
+  color: #92400e;
+  padding: 3px 10px;
+  border-radius: 12px;
+  font-size: 12px;
+  font-weight: 600;
+  margin-right: 8px;
+  vertical-align: middle;
+}
+
+/* 今日复习按钮：使用 warning 色突出，有任务时高亮闪烁 */
+.btn-review {
+  background: var(--warning);
+  color: #fff;
+  position: relative;
+}
+
+.btn-review:hover {
+  background: #d97706;
+}
+
+.btn-review.has-due {
+  background: var(--danger);
+  animation: pulseReview 1.8s ease-in-out infinite;
+}
+
+@keyframes pulseReview {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.5); }
+  50% { box-shadow: 0 0 0 6px rgba(239, 68, 68, 0); }
+}
+
+/* 统计卡片：危险色（有待复习词时用） */
+.stats-card.danger { background: linear-gradient(135deg, var(--danger-bg) 0%, #fff 100%); }
+.stats-card.danger .num { color: var(--danger); }
+
 /* ===== 测验/拼写 ===== */
 .quiz-panel, .spell-panel {
   max-width: 600px;

@@ -99,6 +99,7 @@
       <section class="view view-flashcard" id="view-flashcard">
         <div class="flashcard-wrap">
           <div class="flashcard-progress">
+            <span id="flashMode" class="flash-mode"></span>
             <span id="flashIndex">1</span> / <span id="flashTotal">10</span>
           </div>
           <div class="flashcard" id="flashcard">
@@ -109,7 +110,7 @@
                 <button class="speak-btn speak-btn-card" id="flashSpeakFront" title="朗读单词">🔊 朗读</button>
                 <p class="card-phonetic" id="flashPhonetic"></p>
                 <p class="card-pos" id="flashPos"></p>
-                <div class="card-hint">点击卡片查看释义</div>
+                <div class="card-hint" id="flashHint">点击卡片查看释义</div>
               </div>
               <div class="flashcard-back">
                 <h2 class="card-word" id="flashWordBack"></h2>
@@ -131,6 +132,7 @@
             <button class="btn-circle" id="flashNext" title="下一个">›</button>
           </div>
           <div class="flashcard-actions">
+            <button class="btn-primary btn-review" id="flashStartReview">今日复习</button>
             <button class="btn-primary" id="flashStartLearned">只看未学的</button>
             <button class="btn-outline" id="flashShuffle">随机顺序</button>
           </div>
