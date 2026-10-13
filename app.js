@@ -12,6 +12,29 @@
     (typeof WORDS_SENIOR !== 'undefined') ? WORDS_SENIOR : []
   );
 
+  // ===== 语音发音功能 =====
+  const synth = window.speechSynthesis || null;
+  let voices = [];
+  function loadVoices() {
+    if (!synth) return;
+    voices = synth.getVoices();
+  }
+  if (synth) {
+    loadVoices();
+    synth.onvoiceschanged = loadVoices;
+  }
+  function speakWord(text) {
+    if (!synth) { toast('当前浏览器不支持语音', 'error'); return; }
+    synth.cancel();
+    const u = new SpeechSynthesisUtterance(text);
+    u.lang = 'en-US';
+    u.rate = 0.85;
+    u.pitch = 1;
+    const enVoice = voices.find(v => v.lang && v.lang.indexOf('en') === 0 && v.localService);
+    if (enVoice) u.voice = enVoice;
+    synth.speak(u);
+  }
+
   // ===== 状态管理 =====
   const STORAGE_KEY = 'vocab_app_state_v1';
   const state = {
@@ -202,7 +225,10 @@
     const mastered = isMastered(w);
     const body = document.getElementById('modalBody');
     body.innerHTML = `
-      <div class="modal-word">${w.word}</div>
+      <div class="modal-word-row">
+        <div class="modal-word">${w.word}</div>
+        <button class="speak-btn" id="modalSpeak" title="朗读单词">🔊</button>
+      </div>
       <div class="modal-phonetic">${w.phonetic} <span style="color:var(--primary);">${w.pos}</span>
         <span class="card-grade-tag ${getGradeClass(w.grade)}" style="margin-left:8px;">${getGradeName(w.grade)}</span>
       </div>
@@ -224,6 +250,8 @@
       </div>`;
     document.getElementById('wordModal').classList.add('show');
 
+    const speakBtn = document.getElementById('modalSpeak');
+    if (speakBtn) speakBtn.onclick = () => speakWord(w.word);
     const learnBtn = document.getElementById('modalLearn');
     const masterBtn = document.getElementById('modalMaster');
     const unmarkBtn = document.getElementById('modalUnmark');
@@ -285,6 +313,11 @@
     }
     document.getElementById('flashTags').innerHTML =
       (w.tags || []).map(t => '<span class="tag-chip">' + t + '</span>').join('');
+    // 绑定闪卡朗读按钮（阻止冒泡，避免触发翻卡）
+    const speakFront = document.getElementById('flashSpeakFront');
+    const speakBack = document.getElementById('flashSpeakBack');
+    if (speakFront) speakFront.onclick = (e) => { e.stopPropagation(); speakWord(w.word); };
+    if (speakBack) speakBack.onclick = (e) => { e.stopPropagation(); speakWord(w.word); };
     flashFlipped = false;
     document.getElementById('flashcard').classList.remove('flipped');
   }

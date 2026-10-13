@@ -662,6 +662,61 @@ body {
   background: var(--primary-bg);
 }
 
+/* ===== 朗读按钮 ===== */
+.speak-btn {
+  border: none;
+  background: var(--primary-bg);
+  color: var(--primary-dark);
+  padding: 7px 14px;
+  border-radius: 20px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  line-height: 1.2;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.speak-btn:hover {
+  background: var(--primary);
+  color: #fff;
+  transform: translateY(-1px);
+  box-shadow: var(--shadow-md);
+}
+
+.speak-btn:active {
+  transform: translateY(0);
+  background: var(--primary-dark);
+}
+
+/* 弹窗单词行：单词 + 朗读按钮 */
+.modal-word-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 6px;
+  flex-wrap: wrap;
+}
+
+.modal-word-row .modal-word {
+  margin-bottom: 0;
+}
+
+/* 闪卡中的朗读按钮 */
+.speak-btn-card {
+  margin: 8px 0;
+  background: #fff;
+  border: 1.5px solid var(--primary-light);
+}
+
+.speak-btn-card:hover {
+  background: var(--primary);
+  border-color: var(--primary);
+}
+
 /* ===== 测验/拼写 ===== */
 .quiz-panel, .spell-panel {
   max-width: 600px;
