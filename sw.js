@@ -3,17 +3,17 @@
    功能: 离线缓存、资源预缓存、更新管理
    =========================================== */
 
-const CACHE_VERSION = 'vocab-pwa-v9';
+const CACHE_VERSION = 'vocab-pwa-v10';
 const CACHE_NAME = CACHE_VERSION;
 
-// 需要预缓存的核心资源（带 ?v=9 版本号，与 index.html 中的引用一致，便于突破 HTTP 缓存）
+// 需要预缓存的核心资源（带 ?v=10 版本号，与 index.html 中的引用一致，便于突破 HTTP 缓存）
 const PRECACHE_URLS = [
   './',
   './index.html',
-  './style.css?v=9',
-  './app.js?v=9',
-  './words_junior.js?v=9',
-  './words_senior.js?v=9',
+  './style.css?v=10',
+  './app.js?v=10',
+  './words_junior.js?v=10',
+  './words_senior.js?v=10',
   './manifest.json',
   './icons/icon-192.png',
   './icons/icon-512.png'
