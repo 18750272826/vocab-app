@@ -257,6 +257,38 @@ body {
   gap: 10px;
 }
 
+/* 单词本三档筛选：未学 / 已学 / 已掌握 */
+.list-filter-tabs {
+  display: flex;
+  gap: 6px;
+  background: #f1f5f9;
+  padding: 4px;
+  border-radius: 22px;
+}
+
+.filter-tab {
+  border: none;
+  background: transparent;
+  color: #64748b;
+  padding: 6px 16px;
+  border-radius: 18px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+  font-family: inherit;
+}
+
+.filter-tab:hover {
+  color: var(--primary-dark);
+}
+
+.filter-tab.active {
+  background: var(--primary);
+  color: #fff;
+  box-shadow: 0 2px 8px rgba(99, 102, 241, 0.35);
+}
+
 .result-count {
   font-size: 14px;
   color: var(--text-light);
@@ -292,12 +324,6 @@ body {
 
 .btn-text.danger:hover {
   background: var(--danger);
-  color: #fff;
-}
-
-/* 显示已学单词激活态：高亮表示当前正在显示已学/已掌握的单词 */
-.btn-text.active {
-  background: var(--primary);
   color: #fff;
 }
 
