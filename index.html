@@ -10,7 +10,7 @@
   <meta name="apple-mobile-web-app-title" content="词汇速记">
   <meta name="mobile-web-app-capable" content="yes">
   <title>中考+高考核心词汇 - 背单词神器</title>
-  <link rel="stylesheet" href="style.css">
+  <link rel="stylesheet" href="style.css?v=7">
   <link rel="manifest" href="manifest.json">
   <link rel="icon" type="image/png" sizes="32x32" href="icons/favicon-32.png">
   <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
@@ -261,16 +261,27 @@
     </div>
   </div>
 
-  <script src="words_junior.js"></script>
-  <script src="words_senior.js"></script>
-  <script src="app.js"></script>
+  <script src="words_junior.js?v=7"></script>
+  <script src="words_senior.js?v=7"></script>
+  <script src="app.js?v=7"></script>
   <script>
     // ===== Service Worker 注册 =====
     if ('serviceWorker' in navigator) {
+      // 记录页面加载时是否已有 Service Worker 控制：用于区分"首次安装"与"版本更新"
+      var hadController = !!navigator.serviceWorker.controller;
+      var reloading = false;
+      // 新版本 Service Worker 接管后，自动刷新一次，立即加载最新页面
+      navigator.serviceWorker.addEventListener('controllerchange', function() {
+        if (!hadController || reloading) return;
+        reloading = true;
+        window.location.reload();
+      });
       window.addEventListener('load', function() {
         navigator.serviceWorker.register('./sw.js')
           .then(function(reg) {
             console.log('Service Worker 注册成功，作用域:', reg.scope);
+            // 主动检查更新，发现新版本时触发安装
+            reg.update && reg.update();
           })
           .catch(function(err) {
             console.log('Service Worker 注册失败:', err);

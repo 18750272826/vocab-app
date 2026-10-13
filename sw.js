@@ -3,17 +3,17 @@
    功能: 离线缓存、资源预缓存、更新管理
    =========================================== */
 
-const CACHE_VERSION = 'vocab-pwa-v6';
+const CACHE_VERSION = 'vocab-pwa-v7';
 const CACHE_NAME = CACHE_VERSION;
 
-// 需要预缓存的核心资源
+// 需要预缓存的核心资源（带 ?v=7 版本号，与 index.html 中的引用一致，便于突破 HTTP 缓存）
 const PRECACHE_URLS = [
   './',
   './index.html',
-  './style.css',
-  './app.js',
-  './words_junior.js',
-  './words_senior.js',
+  './style.css?v=7',
+  './app.js?v=7',
+  './words_junior.js?v=7',
+  './words_senior.js?v=7',
   './manifest.json',
   './icons/icon-192.png',
   './icons/icon-512.png'
@@ -48,7 +48,8 @@ self.addEventListener('activate', (event) => {
   );
 });
 
-// ===== 请求拦截：缓存优先，网络回退 =====
+// ===== 请求拦截：网络优先，离线回退缓存 =====
+// 在线时始终获取最新版本（保证 PWA 每次打开都能及时更新），离线时才使用缓存
 self.addEventListener('fetch', (event) => {
   const request = event.request;
 
@@ -60,43 +61,27 @@ self.addEventListener('fetch', (event) => {
   // 跳过跨域请求（如字体CDN等）
   if (url.origin !== self.location.origin) return;
 
-  // 缓存优先策略
-  event.respondWith(
-    caches.match(request)
-      .then((cachedResponse) => {
-        if (cachedResponse) {
-          // 命中缓存，同时后台更新（stale-while-revalidate）
-          fetch(request)
-            .then((freshResponse) => {
-              if (freshResponse && freshResponse.status === 200) {
-                caches.open(CACHE_NAME).then((cache) => {
-                  cache.put(request, freshResponse.clone());
-                });
-              }
-            })
-            .catch(() => {});
-          return cachedResponse;
-        }
+  const isDocument = request.mode === 'navigate' || request.destination === 'document';
 
-        // 未命中缓存，从网络获取
-        return fetch(request)
-          .then((response) => {
-            if (!response || response.status !== 200 || response.type !== 'basic') {
-              return response;
-            }
-            // 缓存新资源
-            const responseToCache = response.clone();
-            caches.open(CACHE_NAME).then((cache) => {
-              cache.put(request, responseToCache);
-            });
-            return response;
-          })
-          .catch(() => {
-            // 离线回退：如果是页面请求，返回首页
-            if (request.destination === 'document') {
-              return caches.match('./index.html');
-            }
-          });
+  event.respondWith(
+    // 网络优先：文档请求跳过 HTTP 缓存，确保拿到最新 HTML
+    fetch(request, isDocument ? { cache: 'no-store' } : undefined)
+      .then((response) => {
+        // 缓存最新成功响应，供离线时使用
+        if (response && response.status === 200 && response.type === 'basic') {
+          const copy = response.clone();
+          caches.open(CACHE_NAME).then((cache) => cache.put(request, copy));
+        }
+        return response;
+      })
+      .catch(() => {
+        // 离线回退：优先返回已缓存资源
+        return caches.match(request).then((cached) => {
+          if (cached) return cached;
+          // 页面请求离线时回退到首页缓存
+          if (isDocument) return caches.match('./index.html');
+          return undefined;
+        });
       })
   );
 });
